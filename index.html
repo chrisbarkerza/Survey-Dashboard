@@ -82,6 +82,25 @@
             background-size: 200% 100%;
         }
 
+        .nav-button {
+            background: #3182ce;
+            color: white;
+            text-decoration: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            white-space: nowrap;
+        }
+
+        .nav-button:hover {
+            background: #2c5282;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        }
+
         @keyframes gradientShift {
             0%, 100% { background-position: 0% 50%; }
             50% { background-position: 100% 50%; }
@@ -454,8 +473,13 @@
 <body>
     <div class="dashboard">
         <div class="header">
-            <h1>GenAI in Schools: Strategic Analysis Dashboard</h1>
-            <p>Comprehensive analysis of 112 responses from SAHETI School staff (May 2025)</p>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                <div>
+                    <h1>GenAI in Schools: Strategic Analysis Dashboard</h1>
+                    <p>Comprehensive analysis of 112 responses from SAHETI School staff (May 2025)</p>
+                </div>
+                <a href="index2.html" class="nav-button">View Detailed Data</a>
+            </div>
             
             <div class="header-stats">
                 <div class="stat-card" data-aos="fade-up" data-aos-delay="100">

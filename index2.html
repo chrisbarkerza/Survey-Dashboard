@@ -127,6 +127,60 @@
             box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1);
         }
 
+        .nav-arrow {
+            background: #3182ce;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .nav-arrow:hover {
+            background: #2c5282;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .nav-arrow:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .nav-arrow:disabled {
+            background: #cbd5e0;
+            color: #a0aec0;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .nav-button {
+            background: #3182ce;
+            color: white;
+            text-decoration: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            white-space: nowrap;
+        }
+
+        .nav-button:hover {
+            background: #2c5282;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        }
+
         .stats-bar {
             display: flex;
             justify-content: space-between;
@@ -296,14 +350,23 @@
 <body>
     <div class="dashboard">
         <div class="header">
-            <h1>SAHETI Survey Data Explorer</h1>
-            <p>Interactive analysis of GenAI survey responses with filtering and visualization</p>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                <div>
+                    <h1>SAHETI Survey Data Explorer</h1>
+                    <p>Interactive analysis of GenAI survey responses with filtering and visualization</p>
+                </div>
+                <a href="index.html" class="nav-button">View Summary Data</a>
+            </div>
         </div>
 
         <div class="controls">
             <div class="control-group">
                 <div>
-                    <label for="questionSelect">Select Question:</label>
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                        <label for="questionSelect">Select Question:</label>
+                        <button id="prevQuestion" class="nav-arrow" title="Previous Question">◀</button>
+                        <button id="nextQuestion" class="nav-arrow" title="Next Question">▶</button>
+                    </div>
                     <select id="questionSelect">
                         <option value="">Choose a question...</option>
                     </select>
@@ -369,6 +432,7 @@
         let currentChart = null;
         let currentQuestion = '';
         let currentFilter = 'all';
+        let questionOptions = [];
 
         // Initialize AOS
         AOS.init({
@@ -388,8 +452,8 @@
         // Load and parse CSV data
         async function loadData() {
             try {
-                console.log('Loading sample.csv...');
-                const response = await fetch('./sample.csv');
+                console.log('Loading SAHETI.csv...');
+                const response = await fetch('./SAHETI.csv');
                 
                 if (!response.ok) {
                     throw new Error(`Failed to load CSV: ${response.status} ${response.statusText}`);
@@ -420,7 +484,7 @@
             } catch (error) {
                 console.error('Error loading data:', error);
                 document.getElementById('currentQuestionTitle').textContent = 'Error loading data';
-                document.getElementById('currentQuestionSubtitle').textContent = 'Please check that sample.csv is in the same directory. Open browser console for details.';
+                document.getElementById('currentQuestionSubtitle').textContent = 'Please check that SAHETI.csv is in the same directory. Open browser console for details.';
             }
         }
 
@@ -464,17 +528,19 @@
             select.innerHTML = '<option value="">Choose a question...</option>';
             
             // Filter out non-question columns
-            const questionHeaders = headers.filter(header => 
+            questionOptions = headers.filter(header => 
                 !header.toLowerCase().includes('timestamp') && 
                 header.trim() !== ''
             );
             
-            questionHeaders.forEach(header => {
+            questionOptions.forEach(header => {
                 const option = document.createElement('option');
                 option.value = header;
                 option.textContent = truncateText(header, 80);
                 select.appendChild(option);
             });
+            
+            updateNavigationButtons();
         }
 
         // Truncate text for display
@@ -746,6 +812,7 @@
             
             if (!currentQuestion) {
                 resetDisplay();
+                updateNavigationButtons();
                 return;
             }
             
@@ -756,6 +823,50 @@
             updateFilterBadge();
             analyzeAndDisplay();
             updateFilteredCount();
+            updateNavigationButtons();
+        }
+
+        // Update navigation button states
+        function updateNavigationButtons() {
+            const prevBtn = document.getElementById('prevQuestion');
+            const nextBtn = document.getElementById('nextQuestion');
+            
+            if (questionOptions.length === 0) {
+                prevBtn.disabled = true;
+                nextBtn.disabled = true;
+                return;
+            }
+            
+            const currentIndex = questionOptions.indexOf(currentQuestion);
+            
+            prevBtn.disabled = currentIndex <= 0;
+            nextBtn.disabled = currentIndex >= questionOptions.length - 1 || currentIndex === -1;
+        }
+
+        // Navigate to previous question
+        function navigateToPrevious() {
+            if (questionOptions.length === 0) return;
+            
+            const currentIndex = questionOptions.indexOf(currentQuestion);
+            if (currentIndex > 0) {
+                const prevQuestion = questionOptions[currentIndex - 1];
+                const select = document.getElementById('questionSelect');
+                select.value = prevQuestion;
+                onQuestionChange();
+            }
+        }
+
+        // Navigate to next question
+        function navigateToNext() {
+            if (questionOptions.length === 0) return;
+            
+            const currentIndex = questionOptions.indexOf(currentQuestion);
+            if (currentIndex >= -1 && currentIndex < questionOptions.length - 1) {
+                const nextQuestion = questionOptions[currentIndex + 1];
+                const select = document.getElementById('questionSelect');
+                select.value = nextQuestion;
+                onQuestionChange();
+            }
         }
 
         // Handle filter change
@@ -818,6 +929,8 @@
         // Event listeners
         document.getElementById('questionSelect').addEventListener('change', onQuestionChange);
         document.getElementById('staffFilter').addEventListener('change', onFilterChange);
+        document.getElementById('prevQuestion').addEventListener('click', navigateToPrevious);
+        document.getElementById('nextQuestion').addEventListener('click', navigateToNext);
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
