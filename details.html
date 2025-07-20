@@ -181,6 +181,41 @@
             box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
         }
 
+        .tab-buttons {
+            display: flex;
+            gap: 5px;
+            margin-top: 8px;
+        }
+
+        .tab-button {
+            background: #e9ecef;
+            color: #495057;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+
+        .tab-button:hover {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .tab-button.active {
+            background: #3182ce;
+            color: white;
+            border-color: #3182ce;
+        }
+
+        .tab-button.active:hover {
+            background: #2c5282;
+            border-color: #2c5282;
+        }
+
         .stats-bar {
             display: flex;
             justify-content: space-between;
@@ -372,12 +407,12 @@
                     </select>
                 </div>
                 <div>
-                    <label for="staffFilter">Staff Type Filter:</label>
-                    <select id="staffFilter">
-                        <option value="all">All Staff</option>
-                        <option value="academic">Academic Staff</option>
-                        <option value="non-teaching">Non-teaching Staff</option>
-                    </select>
+                    <label>Staff Type:</label>
+                    <div class="tab-buttons">
+                        <button class="tab-button active" data-filter="all">All Staff</button>
+                        <button class="tab-button" data-filter="academic">Academic Staff</button>
+                        <button class="tab-button" data-filter="non-teaching">Non-teaching Staff</button>
+                    </div>
                 </div>
             </div>
             
@@ -433,6 +468,7 @@
         let currentQuestion = '';
         let currentFilter = 'all';
         let questionOptions = [];
+        let roleColumnName = '';
 
         // Initialize AOS
         AOS.init({
@@ -477,6 +513,16 @@
                         surveyData.push(row);
                     }
                 }
+                
+                console.log('Headers loaded:', headers);
+                console.log('Total rows loaded:', surveyData.length);
+                console.log('First row data:', surveyData[0]);
+                
+                // Find the role column by searching for partial match
+                const roleColumnPattern = 'Which of the following best describes your role';
+                roleColumnName = headers.find(h => h.includes(roleColumnPattern));
+                console.log('Found role column:', roleColumnName);
+                console.log('Sample role values:', surveyData.slice(0, 5).map(row => row[roleColumnName]));
                 
                 populateQuestionDropdown(headers);
                 updateStats();
@@ -551,14 +597,12 @@
 
         // Update statistics
         function updateStats() {
-            const roleColumn = '1.7) Which of the following best describes your role at the school? ';
-            
             const totalCount = surveyData.length;
             const academicCount = surveyData.filter(row => 
-                row[roleColumn] && row[roleColumn].includes('Academic Staff')
+                row[roleColumnName] && row[roleColumnName].startsWith('1.')
             ).length;
             const nonTeachingCount = surveyData.filter(row => 
-                row[roleColumn] && row[roleColumn].includes('Non-teaching')
+                row[roleColumnName] && row[roleColumnName].startsWith('2.')
             ).length;
             
             document.getElementById('totalResponses').textContent = totalCount;
@@ -580,14 +624,12 @@
                 return surveyData;
             }
             
-            const roleColumn = '1.7) Which of the following best describes your role at the school? ';
-            
             return surveyData.filter(row => {
-                const role = row[roleColumn] || '';
+                const role = row[roleColumnName] || '';
                 if (currentFilter === 'academic') {
-                    return role.includes('Academic Staff');
+                    return role.startsWith('1.');
                 } else if (currentFilter === 'non-teaching') {
-                    return role.includes('Non-teaching');
+                    return role.startsWith('2.');
                 }
                 return true;
             });
@@ -869,16 +911,25 @@
             }
         }
 
-        // Handle filter change
-        function onFilterChange() {
-            const select = document.getElementById('staffFilter');
-            currentFilter = select.value;
+        // Handle tab change
+        function onTabChange(filterValue) {
+            currentFilter = filterValue;
+            
+            console.log('Tab changed to:', filterValue);
+            
+            // Update active tab
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            document.querySelector(`[data-filter="${filterValue}"]`).classList.add('active');
             
             updateFilterBadge();
             updateFilteredCount();
             
+            // ALWAYS trigger analysis if we have a question
             if (currentQuestion) {
+                console.log('Re-analyzing with new filter...');
                 analyzeAndDisplay();
+            } else {
+                console.log('No question selected, but filter changed');
             }
         }
 
@@ -928,9 +979,15 @@
 
         // Event listeners
         document.getElementById('questionSelect').addEventListener('change', onQuestionChange);
-        document.getElementById('staffFilter').addEventListener('change', onFilterChange);
         document.getElementById('prevQuestion').addEventListener('click', navigateToPrevious);
         document.getElementById('nextQuestion').addEventListener('click', navigateToNext);
+        
+        // Tab button listeners
+        document.querySelectorAll('.tab-button').forEach(button => {
+            button.addEventListener('click', () => {
+                onTabChange(button.dataset.filter);
+            });
+        });
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
