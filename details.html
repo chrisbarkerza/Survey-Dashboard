@@ -49,8 +49,8 @@
         }
 
         .dashboard {
-            max-width: 1400px;
-            margin: 0 auto;
+            width: 100%;
+            margin: 0;
             padding: 20px;
         }
 
@@ -59,7 +59,7 @@
             backdrop-filter: blur(10px);
             padding: 30px;
             border-radius: 20px;
-            margin-bottom: 30px;
+            margin-bottom: 15px;
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
             transform: translateY(0);
             transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
@@ -92,7 +92,7 @@
             backdrop-filter: blur(10px);
             padding: 25px;
             border-radius: 15px;
-            margin-bottom: 30px;
+            margin-bottom: 15px;
             box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1);
             border: 1px solid rgba(255, 255, 255, 0.2);
         }
@@ -260,6 +260,9 @@
             color: #1e3a5f;
             font-weight: 600;
             margin-bottom: 10px;
+            line-height: 1.4;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
 
         .question-subtitle {
@@ -397,43 +400,24 @@
         <div class="controls">
             <div class="control-group">
                 <div>
-                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-                        <label for="questionSelect">Select Question:</label>
-                        <button id="prevQuestion" class="nav-arrow" title="Previous Question">◀</button>
-                        <button id="nextQuestion" class="nav-arrow" title="Next Question">▶</button>
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <label for="questionSelect">Select Question:</label>
+                            <button id="prevQuestion" class="nav-arrow" title="Previous Question">◀</button>
+                            <button id="nextQuestion" class="nav-arrow" title="Next Question">▶</button>
+                        </div>
+                        <div class="tab-buttons">
+                            <button class="tab-button active" data-filter="all">All Staff</button>
+                            <button class="tab-button" data-filter="academic">Academic Staff</button>
+                            <button class="tab-button" data-filter="non-teaching">Non-teaching Staff</button>
+                        </div>
                     </div>
-                    <select id="questionSelect">
+                    <select id="questionSelect" style="width: 100%;">
                         <option value="">Choose a question...</option>
                     </select>
                 </div>
-                <div>
-                    <label>Staff Type:</label>
-                    <div class="tab-buttons">
-                        <button class="tab-button active" data-filter="all">All Staff</button>
-                        <button class="tab-button" data-filter="academic">Academic Staff</button>
-                        <button class="tab-button" data-filter="non-teaching">Non-teaching Staff</button>
-                    </div>
-                </div>
             </div>
             
-            <div class="stats-bar">
-                <div class="stats-item">
-                    <div class="stats-number" id="totalResponses">-</div>
-                    <div class="stats-label">Total Responses</div>
-                </div>
-                <div class="stats-item">
-                    <div class="stats-number" id="academicCount">-</div>
-                    <div class="stats-label">Academic Staff</div>
-                </div>
-                <div class="stats-item">
-                    <div class="stats-number" id="nonTeachingCount">-</div>
-                    <div class="stats-label">Non-teaching Staff</div>
-                </div>
-                <div class="stats-item">
-                    <div class="stats-number" id="filteredCount">-</div>
-                    <div class="stats-label">Filtered Results</div>
-                </div>
-            </div>
         </div>
 
         <div class="data-container">
@@ -482,7 +466,14 @@
         const colorSchemes = {
             primary: ['#1e3a5f', '#2c5282', '#3182ce', '#4a90c2', '#5a9fd4'],
             gradient: ['#1e3a5f', '#2c5282', '#3182ce', '#d4af37', '#b8860b'],
-            neutral: ['#6c757d', '#495057', '#343a40', '#212529', '#f8f9fa']
+            neutral: ['#6c757d', '#495057', '#343a40', '#212529', '#f8f9fa'],
+            // New color schemes for specific response counts
+            one_column: ['#007bff'], // Blue
+            two_column: ['#dc3545', '#28a745'], // Red, Green
+            three_column: ['#dc3545', '#fd7e14', '#28a745'], // Red, Orange, Green
+            four_column: ['#dc3545', '#f8a2a2', '#90ee90', '#28a745'], // Red, Light Red, Light Green, Green
+            five_column: ['#dc3545', '#f8a2a2', '#fd7e14', '#90ee90', '#28a745'], // Red, Light Red, Orange, Light Green, Green
+            six_plus_column: ['#007bff'] // Blue for horizontal bar charts
         };
 
         // Load and parse CSV data
@@ -582,9 +573,16 @@
             questionOptions.forEach(header => {
                 const option = document.createElement('option');
                 option.value = header;
-                option.textContent = truncateText(header, 80);
+                option.textContent = truncateText(header, 150);
                 select.appendChild(option);
             });
+            
+            // Auto-select the first question (Q1)
+            if (questionOptions.length > 0) {
+                select.value = questionOptions[0];
+                currentQuestion = questionOptions[0];
+                onQuestionChange();
+            }
             
             updateNavigationButtons();
         }
@@ -662,41 +660,187 @@
             return match ? parseInt(match[1]) : null;
         }
 
+        // Helper function to detect if a question asks for numeric responses
+        function isNumericResponseQuestion(questionHeader) {
+            return /^\d+\.\d+\)\s*How many/i.test(questionHeader);
+        }
+
+        // Helper function to extract numeric value from response text
+        function extractNumericValue(responseText) {
+            if (!responseText || responseText.trim() === '') return null;
+            const match = responseText.match(/^(\d+)/);
+            return match ? parseInt(match[1]) : null;
+        }
+
+        // Helper function to sort responses numerically for "How many..." questions
+        function sortNumericResponses(entries) {
+            return entries.sort(([labelA,], [labelB,]) => {
+                const numA = extractNumericValue(labelA);
+                const numB = extractNumericValue(labelB);
+                
+                if (numA !== null && numB !== null) {
+                    return numA - numB;
+                }
+                
+                if (numA !== null && numB === null) return -1;
+                if (numA === null && numB !== null) return 1;
+                
+                return labelA.localeCompare(labelB);
+            });
+        }
+
+        // Parse comma-separated text responses and create counts
+        function parseCommaSeparatedResponses(responses) {
+            const counts = {};
+            
+            responses.forEach(response => {
+                if (response && response.trim() !== '') {
+                    const items = response.split(/[,;\n]/)
+                        .map(item => item.trim())
+                        .filter(item => item.length > 0);
+                    
+                    items.forEach(item => {
+                        const cleanItem = item.replace(/^["']|["']$/g, '').trim();
+                        if (cleanItem.length > 0) {
+                            counts[cleanItem] = (counts[cleanItem] || 0) + 1;
+                        }
+                    });
+                }
+            });
+            
+            return {
+                responses: responses,
+                counts: counts,
+                total: Object.values(counts).reduce((sum, count) => sum + count, 0),
+                unique: Object.keys(counts).length
+            };
+        }
+
         // Determine chart type based on question and responses
         function determineChartType(questionHeader, analysis) {
-            const question = questionHeader.toLowerCase();
             const responses = Object.keys(analysis.counts);
             
-            // Check if it's a text question
-            if (analysis.unique > 10 && responses.some(r => r.length > 50)) {
-                return 'text';
+            // 6 or more unique responses: horizontal bar chart
+            if (analysis.unique >= 6) {
+                return 'horizontal_bar';
             }
             
-            // Check for Likert scale patterns
-            const likertPattern = responses.some(r => 
-                r.includes('Agree') || r.includes('Disagree') || r.includes('Neutral')
-            );
-            if (likertPattern) return 'bar';
+            // 1-5 unique responses: vertical bar chart
+            return 'bar';
+        }
+
+        // Create horizontal bar chart for 6+ unique responses
+        function createHorizontalBarChart(questionHeader, analysis) {
+            const ctx = document.getElementById('mainChart');
             
-            // Check for Yes/No/Maybe patterns
-            const binaryPattern = responses.every(r => 
-                r.includes('Yes') || r.includes('No') || r.includes('Maybe') || 
-                r.includes('never') || r.includes('thinking')
-            );
-            if (binaryPattern && analysis.unique <= 5) return 'pie';
+            // Destroy existing chart
+            if (currentChart) {
+                currentChart.destroy();
+            }
             
-            // Default to bar chart for categorical data
-            if (analysis.unique <= 15) return 'bar';
+            // Check if this is a text response question that needs comma parsing
+            let processedAnalysis = analysis;
+            if (analysis.unique >= 6) {
+                const filteredData = getFilteredData();
+                const responses = filteredData.map(row => row[questionHeader]).filter(r => r && r.trim() !== '');
+                processedAnalysis = parseCommaSeparatedResponses(responses);
+            }
             
-            return 'text';
+            // Prepare data
+            let sortedEntries = Object.entries(processedAnalysis.counts);
+            
+            // Apply numeric sorting for "How many..." questions
+            if (isNumericResponseQuestion(questionHeader)) {
+                sortedEntries = sortNumericResponses(sortedEntries);
+            } else {
+                // Sort by response count (descending) for better visualization
+                sortedEntries.sort(([,a], [,b]) => b - a);
+            }
+            
+            const labels = sortedEntries.map(([label,]) => truncateText(label, 30));
+            const data = sortedEntries.map(([,count]) => count);
+            
+            const chartConfig = {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Responses',
+                        data: data,
+                        backgroundColor: colorSchemes.six_plus_column[0],
+                        borderColor: colorSchemes.six_plus_column[0],
+                        borderWidth: 1,
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const total = data.reduce((a, b) => a + b, 0);
+                                    const percentage = ((context.parsed.x * 100) / total).toFixed(1);
+                                    return `${context.label}: ${context.parsed.x} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1
+                            }
+                        },
+                        y: {
+                            ticks: {
+                                callback: function(value, index, values) {
+                                    const label = this.getLabelForValue(value);
+                                    const maxLength = 35;
+                                    if (label.length <= maxLength) return label;
+                                    
+                                    const words = label.split(' ');
+                                    const lines = [];
+                                    let currentLine = '';
+                                    
+                                    for (const word of words) {
+                                        if ((currentLine + ' ' + word).length <= maxLength) {
+                                            currentLine += (currentLine ? ' ' : '') + word;
+                                        } else {
+                                            if (currentLine) lines.push(currentLine);
+                                            currentLine = word;
+                                        }
+                                    }
+                                    if (currentLine) lines.push(currentLine);
+                                    
+                                    return lines;
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+            
+            currentChart = new Chart(ctx, chartConfig);
+            
+            // Show chart
+            document.getElementById('mainChart').style.display = 'block';
+            document.getElementById('chartPlaceholder').style.display = 'none';
         }
 
         // Create chart based on analysis
         function createChart(questionHeader, analysis) {
             const chartType = determineChartType(questionHeader, analysis);
             
-            if (chartType === 'text') {
-                displayTextResponses(analysis.responses);
+            if (chartType === 'horizontal_bar') {
+                // Create horizontal bar chart for 6+ unique responses
+                createHorizontalBarChart(questionHeader, analysis);
                 return;
             }
             
@@ -726,21 +870,39 @@
             const sortedLabels = combined.map(item => truncateText(item.label, 30));
             const sortedData = combined.map(item => item.count);
             
+            // Determine colors based on number of responses
+            let colors;
+            switch (sortedData.length) {
+                case 1:
+                    colors = colorSchemes.one_column;
+                    break;
+                case 2:
+                    colors = colorSchemes.two_column;
+                    break;
+                case 3:
+                    colors = colorSchemes.three_column;
+                    break;
+                case 4:
+                    colors = colorSchemes.four_column;
+                    break;
+                case 5:
+                    colors = colorSchemes.five_column;
+                    break;
+                default:
+                    colors = colorSchemes.primary.slice(0, sortedData.length);
+            }
+            
             const chartConfig = {
-                type: chartType,
+                type: 'bar',
                 data: {
                     labels: sortedLabels,
                     datasets: [{
                         label: 'Responses',
                         data: sortedData,
-                        backgroundColor: chartType === 'pie' ? 
-                            colorSchemes.gradient.slice(0, sortedData.length) :
-                            colorSchemes.primary[0],
-                        borderColor: chartType === 'pie' ? 
-                            colorSchemes.gradient.slice(0, sortedData.length) :
-                            colorSchemes.primary[0],
-                        borderWidth: chartType === 'pie' ? 2 : 1,
-                        borderRadius: chartType === 'bar' ? 8 : 0
+                        backgroundColor: colors,
+                        borderColor: colors,
+                        borderWidth: 1,
+                        borderRadius: 8
                     }]
                 },
                 options: {
@@ -748,20 +910,19 @@
                     maintainAspectRatio: false,
                     plugins: {
                         legend: {
-                            display: chartType === 'pie',
-                            position: 'bottom'
+                            display: false
                         },
                         tooltip: {
                             callbacks: {
                                 label: function(context) {
                                     const total = sortedData.reduce((a, b) => a + b, 0);
-                                    const percentage = ((context.parsed * 100) / total).toFixed(1);
-                                    return `${context.label}: ${context.parsed} (${percentage}%)`;
+                                    const percentage = ((context.parsed.y * 100) / total).toFixed(1);
+                                    return `${context.label}: ${context.parsed.y} (${percentage}%)`;
                                 }
                             }
                         }
                     },
-                    scales: chartType === 'bar' ? {
+                    scales: {
                         y: {
                             beginAtZero: true,
                             ticks: {
@@ -770,10 +931,32 @@
                         },
                         x: {
                             ticks: {
-                                maxRotation: 45
+                                maxRotation: 0,
+                                minRotation: 0,
+                                callback: function(value, index, values) {
+                                    const label = this.getLabelForValue(value);
+                                    const maxLength = 15;
+                                    if (label.length <= maxLength) return label;
+                                    
+                                    const words = label.split(' ');
+                                    const lines = [];
+                                    let currentLine = '';
+                                    
+                                    for (const word of words) {
+                                        if ((currentLine + ' ' + word).length <= maxLength) {
+                                            currentLine += (currentLine ? ' ' : '') + word;
+                                        } else {
+                                            if (currentLine) lines.push(currentLine);
+                                            currentLine = word;
+                                        }
+                                    }
+                                    if (currentLine) lines.push(currentLine);
+                                    
+                                    return lines;
+                                }
                             }
                         }
-                    } : {}
+                    }
                 }
             };
             
@@ -832,8 +1015,14 @@
             const total = analysis.total;
             
             // Sort by numerical order of responses
-            const sortedEntries = Object.entries(analysis.counts)
-                .sort(([labelA,], [labelB,]) => {
+            let sortedEntries = Object.entries(analysis.counts);
+            
+            // Apply numeric sorting for "How many..." questions
+            if (isNumericResponseQuestion(questionHeader)) {
+                sortedEntries = sortNumericResponses(sortedEntries);
+            } else {
+                // Use existing response number ordering for standard questions
+                sortedEntries.sort(([labelA,], [labelB,]) => {
                     const aNum = extractResponseNumber(labelA);
                     const bNum = extractResponseNumber(labelB); 
                     if (aNum !== null && bNum !== null) {
@@ -841,6 +1030,7 @@
                     }
                     return labelA.localeCompare(labelB);  // Alphabetical fallback
                 });
+            }
             
             sortedEntries.forEach(([response, count]) => {
                 const row = document.createElement('tr');
@@ -881,7 +1071,7 @@
             }
             
             // Update display
-            document.getElementById('currentQuestionTitle').textContent = truncateText(currentQuestion, 100);
+            document.getElementById('currentQuestionTitle').textContent = currentQuestion;
             document.getElementById('currentQuestionSubtitle').textContent = `Analysis of responses with current filter applied`;
             
             updateFilterBadge();
@@ -972,12 +1162,24 @@
         function analyzeAndDisplay() {
             if (!currentQuestion) return;
             
-            const analysis = analyzeQuestion(currentQuestion);
+            let analysis = analyzeQuestion(currentQuestion);
             
             if (analysis.total === 0) {
                 resetDisplay();
                 document.getElementById('currentQuestionSubtitle').textContent = 'No responses found for this question with current filter';
                 return;
+            }
+            
+            // For questions with many unique responses, try parsing as comma-separated text
+            if (analysis.unique >= 6) {
+                const filteredData = getFilteredData();
+                const responses = filteredData.map(row => row[currentQuestion]).filter(r => r && r.trim() !== '');
+                const parsedAnalysis = parseCommaSeparatedResponses(responses);
+                
+                // Use parsed analysis if it results in fewer unique items (indicates successful parsing)
+                if (parsedAnalysis.unique < analysis.unique && parsedAnalysis.unique > 0) {
+                    analysis = parsedAnalysis;
+                }
             }
             
             createChart(currentQuestion, analysis);

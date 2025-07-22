@@ -10,7 +10,8 @@
       "Bash(gh repo create:*)",
       "Bash(grep:*)",
       "Bash(mv:*)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(python3:*)"
     ],
     "deny": []
   }
