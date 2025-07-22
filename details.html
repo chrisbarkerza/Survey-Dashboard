@@ -597,13 +597,13 @@
 
         // Update statistics
         function updateStats() {
-            const totalCount = surveyData.length;
             const academicCount = surveyData.filter(row => 
                 row[roleColumnName] && row[roleColumnName].startsWith('1.')
             ).length;
             const nonTeachingCount = surveyData.filter(row => 
                 row[roleColumnName] && row[roleColumnName].startsWith('2.')
             ).length;
+            const totalCount = academicCount + nonTeachingCount;
             
             document.getElementById('totalResponses').textContent = totalCount;
             document.getElementById('academicCount').textContent = academicCount;
@@ -655,6 +655,13 @@
             };
         }
 
+        // Helper function to extract numerical order from response labels
+        function extractResponseNumber(label) {
+            // Extract leading number from responses like "1. Strongly Disagree", "2. No", "5. Yes, I pay"
+            const match = label.match(/^(\d+)\.?\s*/);
+            return match ? parseInt(match[1]) : null;
+        }
+
         // Determine chart type based on question and responses
         function determineChartType(questionHeader, analysis) {
             const question = questionHeader.toLowerCase();
@@ -704,9 +711,17 @@
             const labels = Object.keys(analysis.counts);
             const data = Object.values(analysis.counts);
             
-            // Sort by frequency for better visualization
+            // Sort by numerical order of responses for better visualization
             const combined = labels.map((label, i) => ({ label, count: data[i] }));
-            combined.sort((a, b) => b.count - a.count);
+            combined.sort((a, b) => {
+                // Try to extract numbers from response labels for natural ordering
+                const aNum = extractResponseNumber(a.label);
+                const bNum = extractResponseNumber(b.label);
+                if (aNum !== null && bNum !== null) {
+                    return aNum - bNum;  // Numerical order
+                }
+                return a.label.localeCompare(b.label);  // Alphabetical fallback
+            });
             
             const sortedLabels = combined.map(item => truncateText(item.label, 30));
             const sortedData = combined.map(item => item.count);
@@ -816,9 +831,16 @@
             const tbody = document.createElement('tbody');
             const total = analysis.total;
             
-            // Sort by count
+            // Sort by numerical order of responses
             const sortedEntries = Object.entries(analysis.counts)
-                .sort(([,a], [,b]) => b - a);
+                .sort(([labelA,], [labelB,]) => {
+                    const aNum = extractResponseNumber(labelA);
+                    const bNum = extractResponseNumber(labelB); 
+                    if (aNum !== null && bNum !== null) {
+                        return aNum - bNum;  // Numerical order
+                    }
+                    return labelA.localeCompare(labelB);  // Alphabetical fallback
+                });
             
             sortedEntries.forEach(([response, count]) => {
                 const row = document.createElement('tr');
